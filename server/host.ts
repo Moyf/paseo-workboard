@@ -102,6 +102,10 @@ export interface Host {
     assigned: boolean,
   ): Promise<string[]>;
   setPinned(workspaceId: string, pinned: boolean): Promise<string | null>;
+  setTitle(workspaceId: string, title: string): Promise<string>;
+  markUnread(workspaceId: string): Promise<void>;
+  clearAttention(workspaceId: string): Promise<void>;
+  listLabels(): Promise<Array<{ name: string; color: string }>>;
   create(
     source: Extract<StartInput["target"], { kind: "new" }>["source"],
     title: string,
@@ -502,6 +506,18 @@ export class PaseoHost implements Host {
   }
   setPinned(id: string, pinned: boolean) {
     return this.compat.setPinned(id, pinned);
+  }
+  setTitle(id: string, title: string) {
+    return this.compat.setTitle(id, title);
+  }
+  markUnread(id: string) {
+    return this.compat.markUnread(id);
+  }
+  clearAttention(id: string) {
+    return this.compat.clearAttention(id);
+  }
+  listLabels() {
+    return this.compat.listLabels();
   }
   async create(
     source: Extract<StartInput["target"], { kind: "new" }>["source"],

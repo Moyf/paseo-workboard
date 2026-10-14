@@ -192,6 +192,20 @@ const zh = {
   exclusiveStatusLabels: "状态标签互斥（新标签替换旧标签）",
   exclusiveStatusHint:
     "任务在外部获得新的状态标签时，自动移除上一次的状态标签，只保留最新选择的分组；仅作用于下方分组配置的标签，其他标签不受影响。无法判断哪个标签更新时，仍会显示标签冲突提示。",
+  pinWorkspace: "置顶",
+  unpinWorkspace: "取消置顶",
+  copyPath: "复制路径",
+  copyBranchName: "复制分支名称",
+  renameWorkspace: "重命名 workspace",
+  markUnread: "标记为未读",
+  clearAttention: "标记为已读",
+  archiveWorkspace: "归档 workspace",
+  archiveWorkspaceConfirm:
+    "归档 workspace“{name}”？将停止其中的 Agent 和 terminal，且无法在 Workboard 里撤销。",
+  labelsSection: "标签",
+  copied: "已复制",
+  copyFailed: "复制失败",
+  renamed: "已重命名",
   settingsTitle: "设置",
   generalSettings: "通用",
   groups: "分组",
@@ -289,6 +303,7 @@ const zh = {
   },
   archiveConfirmedByUser: "归档结果已由用户确认",
   mutationErrors: {
+    "workspace-unavailable": "workspace 不可用（已归档、正在归档或绑定中）。",
     "card-order-changed": "列内任务顺序或成员已改变，请刷新后重试。",
     "card-order-invalid":
       "排序无效；只能移动当前任务并保留其它任务的相对顺序。",
@@ -314,6 +329,18 @@ const zh = {
       "Paseo 未完成 workspace 置顶，请刷新后核实。",
     "Paseo did not remove the workspace pin":
       "Paseo 未取消 workspace 置顶，请刷新后核实。",
+    "Paseo workspace rename response workspace mismatch":
+      "Paseo 重命名响应对应了其它 workspace，请刷新后核实。",
+    "Paseo workspace rename rejected":
+      "Paseo 拒绝了 workspace 重命名，请重试。",
+    "Paseo did not apply the workspace title":
+      "Paseo 未完成 workspace 重命名，请刷新后核实。",
+    "Paseo mark-unread response workspace mismatch":
+      "Paseo 未读标记响应对应了其它 workspace，请刷新后核实。",
+    "Paseo mark-unread rejected": "Paseo 拒绝了标记未读操作，请重试。",
+    "Paseo clear-attention response workspace missing":
+      "Paseo 已读标记响应对应了其它 workspace，请刷新后核实。",
+    "Paseo clear-attention rejected": "Paseo 拒绝了标记已读操作，请重试。",
     "Workboard installation mismatch; use the manifest plugin ID":
       "Workboard 安装标识不匹配，请使用 manifest 中的插件 ID。",
     "Paseo did not provide its plugin API":
@@ -610,6 +637,20 @@ const en: typeof zh = {
   exclusiveStatusLabels: "Exclusive status labels (newest replaces old)",
   exclusiveStatusHint:
     "When a task gains a new status label outside Workboard, remove the previous status label and keep only the latest group. Only labels configured as groups below are affected; ordinary labels are untouched. Conflicts whose newest label cannot be determined still raise the banner.",
+  pinWorkspace: "Pin",
+  unpinWorkspace: "Unpin",
+  copyPath: "Copy path",
+  copyBranchName: "Copy branch name",
+  renameWorkspace: "Rename workspace",
+  markUnread: "Mark as unread",
+  clearAttention: "Mark as read",
+  archiveWorkspace: "Archive workspace",
+  archiveWorkspaceConfirm:
+    "Archive workspace “{name}”? Its agents and terminals stop, and Workboard cannot undo this.",
+  labelsSection: "Labels",
+  copied: "Copied",
+  copyFailed: "Copy failed",
+  renamed: "Renamed",
   settingsTitle: "Settings",
   generalSettings: "General",
   groups: "Groups",
@@ -715,6 +756,8 @@ const en: typeof zh = {
   },
   archiveConfirmedByUser: "Archive outcome confirmed by user",
   mutationErrors: {
+    "workspace-unavailable":
+      "The workspace is unavailable (archived, archiving, or binding).",
     "card-order-changed":
       "Column order or membership changed. Refresh and retry.",
     "card-order-invalid":
@@ -744,6 +787,20 @@ const en: typeof zh = {
       "Paseo did not pin the workspace. Refresh and verify it.",
     "Paseo did not remove the workspace pin":
       "Paseo did not unpin the workspace. Refresh and verify it.",
+    "Paseo workspace rename response workspace mismatch":
+      "The Paseo rename response matched another workspace. Refresh and verify.",
+    "Paseo workspace rename rejected":
+      "Paseo rejected the workspace rename. Retry.",
+    "Paseo did not apply the workspace title":
+      "Paseo did not rename the workspace. Refresh and verify it.",
+    "Paseo mark-unread response workspace mismatch":
+      "The Paseo mark-unread response matched another workspace. Refresh and verify.",
+    "Paseo mark-unread rejected":
+      "Paseo rejected marking the workspace unread. Retry.",
+    "Paseo clear-attention response workspace missing":
+      "The Paseo mark-read response matched another workspace. Refresh and verify.",
+    "Paseo clear-attention rejected":
+      "Paseo rejected marking the workspace read. Retry.",
     "Workboard installation mismatch; use the manifest plugin ID":
       "The Workboard installation ID does not match. Use the manifest plugin ID.",
     "Paseo did not provide its plugin API":

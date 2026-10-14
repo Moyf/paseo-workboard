@@ -75,6 +75,14 @@ export function fixture(initial: Partial<Data> = {}) {
       if (assigned) w.labels.push(name);
       return w.labels;
     }),
+    setTitle: vi.fn(async (id, title) => {
+      const w = inventory.workspaces.find((w) => w.id === id)!;
+      w.name = title;
+      return title;
+    }),
+    markUnread: vi.fn(async () => undefined),
+    clearAttention: vi.fn(async () => undefined),
+    listLabels: vi.fn(async () => [{ name: "customer", color: "blue" }]),
     setPinned: vi.fn(async (id, pinned) => {
       const w = inventory.workspaces.find((w) => w.id === id)!;
       w.pinnedAt = pinned ? new Date(now() + ++pinWrites).toISOString() : null;

@@ -721,3 +721,155 @@ it("keeps default behavior unchanged when exclusivity is off", async () => {
     board.dispose();
   }
 });
+
+it("pins and unpins a workspace from the card menu", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:todo"]));
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    const pinned = await board.mutate({
+      action: "pin",
+      taskId: card.id,
+      pinned: true,
+    });
+    expect(host.setPinned).toHaveBeenCalledWith("w", true);
+    expect(pinned.cards[0].pinState).toBe("manual");
+    const unpinned = await board.mutate({
+      action: "pin",
+      taskId: card.id,
+      pinned: false,
+    });
+    expect(unpinned.cards[0].pinState).toBe("none");
+  } finally {
+    board.dispose();
+  }
+});
+it("renames a workspace and syncs the task title", async () => {
+  const { board, host, inventory, store } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:todo"]));
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    const next = await board.mutate({
+      action: "rename-workspace",
+      taskId: card.id,
+      title: "Renamed",
+    });
+    expect(host.setTitle).toHaveBeenCalledWith("w", "Renamed");
+    expect(next.cards[0].title).toBe("Renamed");
+    expect(store.current.tasks[0].title).toBe("Renamed");
+  } finally {
+    board.dispose();
+  }
+});
+it("sets and removes an ordinary label from the card menu", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    const added = await board.mutate({
+      action: "set-label",
+      taskId: card.id,
+      label: { name: "urgent", color: "#ff0000" },
+      assigned: true,
+    });
+    expect(host.setLabel).toHaveBeenCalledWith("w", "urgent", "#ff0000", true);
+    expect(added.cards[0].labels).toContain("urgent");
+    const removed = await board.mutate({
+      action: "set-label",
+      taskId: card.id,
+      label: { name: "urgent", color: "#ff0000" },
+      assigned: false,
+    });
+    expect(removed.cards[0].labels).not.toContain("urgent");
+  } finally {
+    board.dispose();
+  }
+});
+it("marks a workspace unread and clears its attention through the bridge", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:done"]));
+  inventory.agents.push({
+    id: "a",
+    workspaceId: "w",
+    title: null,
+    activity: "attention",
+    updatedAt: "2026-08-01T00:00:00Z",
+    lastUserMessageAt: "2026-08-01T00:00:00Z",
+  });
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    await board.mutate({ action: "mark-unread", taskId: card.id });
+    expect(host.markUnread).toHaveBeenCalledWith("w");
+    await board.mutate({ action: "clear-attention", taskId: card.id });
+    expect(host.clearAttention).toHaveBeenCalledWith("w");
+  } finally {
+    board.dispose();
+  }
+});
+it("archives a workspace from the card menu and records a manual archive", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:done"]));
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    const next = await board.mutate({
+      action: "archive-workspace",
+      taskId: card.id,
+    });
+    expect(host.archive).toHaveBeenCalledWith("w");
+    expect(next.cards[0].archived).toMatchObject({
+      kind: "manual",
+      status: "archived",
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("refuses a card-menu archive when git safety reports an issue", async () => {
+  const { board, host, inventory } = fixture();
+  host.safety = vi.fn(async () => "terminal-open");
+  inventory.workspaces.push(workspace("w", "Task", ["task:done"]));
+  await board.start();
+  try {
+    const card = board.snapshot().cards[0];
+    await expect(
+      board.mutate({ action: "archive-workspace", taskId: card.id }),
+    ).rejects.toThrow("terminal-open");
+    expect(host.archive).not.toHaveBeenCalled();
+  } finally {
+    board.dispose();
+  }
+});
+it("rejects card-menu workspace actions for drafts", async () => {
+  const { board } = fixture();
+  await board.start();
+  try {
+    const card = (
+      await board.mutate({
+        action: "create",
+        title: "Draft",
+        description: "",
+        projectId: null,
+      })
+    ).cards[0];
+    await expect(
+      board.mutate({ action: "pin", taskId: card.id, pinned: true }),
+    ).rejects.toThrow("workspace-unavailable");
+    await expect(
+      board.mutate({
+        action: "rename-workspace",
+        taskId: card.id,
+        title: "Nope",
+      }),
+    ).rejects.toThrow("workspace-unavailable");
+    await expect(
+      board.mutate({ action: "archive-workspace", taskId: card.id }),
+    ).rejects.toThrow("workspace-unavailable");
+  } finally {
+    board.dispose();
+  }
+});

@@ -13,6 +13,8 @@ const card = (id: string, overrides: Partial<Card> = {}): Card =>
     stage: "todo",
     labels: [],
     managedLabels: [],
+    workspaceDirectory: null,
+    currentBranch: null,
     changeRequest: null,
     changeRequestUnavailable: false,
     activity: "idle",
