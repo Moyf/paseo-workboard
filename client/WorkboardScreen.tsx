@@ -33,6 +33,7 @@ import {
 } from "../shared/model";
 import {
   CANCEL_BINDING_BUSY_ERROR_CODE,
+  labelsRpc,
   mutateRpc,
   snapshotRpc,
   type Mutation,
@@ -176,6 +177,14 @@ function HostWorkboard(props: PluginSurfaceProps & { initialPage?: Page }) {
     queryKey: ["workboard", props.host.id],
     queryFn: () => callSnapshot({}),
     refetchInterval: 1_500,
+  });
+  const callLabels = useRpc(labelsRpc);
+  const labelsQuery = useQuery({
+    queryKey: ["workboard-labels", props.host.id],
+    queryFn: () => callLabels({}),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
   });
   const serverBoard = boardQuery.data;
   const language = usePaseoLanguage();
@@ -1370,6 +1379,34 @@ function HostWorkboard(props: PluginSurfaceProps & { initialPage?: Page }) {
             }
             compact={taskLayoutCompact}
             showDragHandle={showDragHandle}
+            labels={labelsQuery.data?.labels}
+            onPin={async (pinned) =>
+              !!(await mutate({ action: "pin", taskId: card.id, pinned }))
+            }
+            onRename={async (title) =>
+              !!(await mutate({
+                action: "rename-workspace",
+                taskId: card.id,
+                title,
+              }))
+            }
+            onMarkUnread={async () =>
+              !!(await mutate({ action: "mark-unread", taskId: card.id }))
+            }
+            onClearAttention={async () =>
+              !!(await mutate({ action: "clear-attention", taskId: card.id }))
+            }
+            onArchiveWorkspace={async () =>
+              !!(await mutate({ action: "archive-workspace", taskId: card.id }))
+            }
+            onSetLabel={async (label, assigned) =>
+              !!(await mutate({
+                action: "set-label",
+                taskId: card.id,
+                label,
+                assigned,
+              }))
+            }
             onUndo={
               moveUndos.has(card.id) ? () => undoMove(card.id) : undefined
             }

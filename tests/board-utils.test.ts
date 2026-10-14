@@ -22,6 +22,8 @@ import {
 const card = (overrides: Partial<Card>): Card => ({
   ...newTask("a", "Fix import", "2026-01-01T00:00:00Z"),
   workspaceId: "workspace",
+  workspaceDirectory: null,
+  currentBranch: null,
   projectId: "p1",
   projectName: "Demo",
   stage: "todo",
