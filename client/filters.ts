@@ -21,12 +21,15 @@ export const REQUEST_FILTERS = [
   "changes-requested",
   "unavailable",
 ] as const;
+export const DATE_RANGES = ["any", "today", "3days", "week", "month"] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const filterSchema = z.object({
   projectId: z.string().min(1).catch("all"),
   search: z.string().catch(""),
   attentionOnly: z.boolean().catch(false),
   activity: z.enum(ACTIVITY_FILTERS).catch("all"),
   changeRequest: z.enum(REQUEST_FILTERS).catch("all"),
+  dateRange: z.enum(DATE_RANGES).catch("any"),
 });
 export type BoardFilters = z.infer<typeof filterSchema>;
 export const DEFAULT_FILTERS: BoardFilters = filterSchema.parse({});
@@ -44,7 +47,37 @@ export function activeFilterCount(filters: BoardFilters): number {
     filters.attentionOnly,
     filters.activity !== "all",
     filters.changeRequest !== "all",
+    filters.dateRange !== "any",
   ].filter(Boolean).length;
+}
+
+/**
+ * A card's displayed date is its last conversation time; cards without one cannot match a
+ * range. Windows start at local midnight — today covers today, 3 days covers today and the
+ * two before it, week is Monday-based, month is the calendar month.
+ */
+export function matchesDateRange(
+  card: Card,
+  range: BoardFilters["dateRange"],
+  now: number,
+): boolean {
+  if (range === "any") return true;
+  const time = card.lastConversationAt
+    ? Date.parse(card.lastConversationAt)
+    : NaN;
+  if (!Number.isFinite(time)) return false;
+  if (time > now) return true;
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const date = new Date(midnight);
+  if (range === "today") return time >= midnight.getTime();
+  if (range === "3days") return time >= midnight.getTime() - 2 * DAY_MS;
+  if (range === "week") {
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    return time >= date.getTime();
+  }
+  date.setDate(1);
+  return time >= date.getTime();
 }
 
 export function matchesRequest(
