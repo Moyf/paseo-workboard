@@ -142,6 +142,7 @@ const preferences = {
   defaultStartGroup: stageSchema.nullable().default(null),
   defaultStartWorkGroup: stageSchema.nullable().default(null),
   pinInProgressWorkspaces: z.boolean().default(true),
+  exclusiveStatusLabels: z.boolean().default(false),
 };
 export const settingsSchema = z.object({
   ...preferences,
@@ -225,6 +226,26 @@ export function resolveStage(
   return found.length > 1
     ? "conflict"
     : (found[0]?.id ?? defaultWorkspaceGroup(groups, configured));
+}
+/**
+ * The one status label an exclusive conflict can attribute to the most recent external
+ * change: every managed label except the task's previous stage's label. Any other shape
+ * (the previous label already gone, two newcomers, an unknown previous stage) stays a
+ * manual conflict, because the newest label cannot be told apart from the rest.
+ */
+export function newestConflictStage(
+  previous: Stage,
+  labels: readonly string[],
+  groups: readonly Group[],
+): Stage | undefined {
+  const prior = groups.find((group) => group.id === previous);
+  if (!prior) return undefined;
+  const newcomer = statusLabels(labels, groups).filter(
+    (label) => labelKey(label) !== labelKey(prior.label),
+  );
+  if (newcomer.length !== 1) return undefined;
+  return groups.find((group) => labelKey(group.label) === labelKey(newcomer[0]))
+    ?.id;
 }
 export function archiveDueAt(
   conversation: string | null,

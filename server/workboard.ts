@@ -14,6 +14,7 @@ import {
   isTerminalGroup,
   labelKey,
   newTask,
+  newestConflictStage,
   orderedGroups,
   resolveStage,
   settingsSchema,
@@ -357,9 +358,16 @@ export class Workboard {
     }
     if (this.stopped) throw new Error("Workboard stopped");
     this.inventory = inventory;
+    const resolutions: Array<{
+      taskId: string;
+      workspaceId: string;
+      stage: Stage;
+      labels: string[];
+    }> = [];
     await this.store.update((data) => {
       for (const workspace of inventory.workspaces) {
         let task = data.tasks.find((t) => t.workspaceId === workspace.id);
+        const imported = !task;
         if (!task) {
           task = {
             ...newTask(
@@ -379,11 +387,35 @@ export class Workboard {
         task.title = workspace.name;
         task.projectId = workspace.projectId;
         task.projectName = workspace.projectDisplayName;
+        const priorStage = imported ? null : task.lastStage;
         task.lastStage = resolveStage(
           workspace.labels,
           data.settings.groups,
           data.settings.defaultStartGroup,
         );
+        // Newest-wins exclusivity: an external edit that added one status label on top of
+        // the previous stage's label is resolvable; any other conflict shape stays manual.
+        if (
+          task.lastStage === "conflict" &&
+          priorStage !== null &&
+          priorStage !== "conflict" &&
+          data.settings.exclusiveStatusLabels &&
+          task.workspaceId &&
+          !task.binding
+        ) {
+          const stage = newestConflictStage(
+            priorStage,
+            workspace.labels,
+            data.settings.groups,
+          );
+          if (stage)
+            resolutions.push({
+              taskId: task.id,
+              workspaceId: task.workspaceId,
+              stage,
+              labels: statusLabels(workspace.labels, data.settings.groups),
+            });
+        }
         const observation = observations.get(workspace.id);
         if (observation) {
           task.lastConversationAt = observation.displayAt;
@@ -438,6 +470,43 @@ export class Workboard {
     this.connected = true;
     this.error = null;
     this.refreshedAt = this.stamp();
+    if (resolutions.length) await this.resolveExclusivityConflicts(resolutions);
+  }
+  /**
+   * Newest-wins resolution of an exclusively conflicting status label: re-run the same
+   * verified label sync a stage change uses, then record the fixed stage. A stale or
+   * failing sync keeps the conflict issue for manual resolution.
+   */
+  private async resolveExclusivityConflicts(
+    resolutions: ReadonlyArray<{
+      taskId: string;
+      workspaceId: string;
+      stage: Stage;
+      labels: string[];
+    }>,
+  ): Promise<void> {
+    for (const resolution of resolutions) {
+      if (this.stopped) return;
+      try {
+        const workspace = await this.transition(
+          resolution.workspaceId,
+          resolution.stage,
+          resolution.labels,
+        );
+        this.inventory.workspaces = this.inventory.workspaces.map((w) =>
+          w.id === workspace.id ? workspace : w,
+        );
+        await this.store.update((data) => {
+          const task = data.tasks.find((t) => t.id === resolution.taskId);
+          if (!task) return;
+          task.lastStage = resolution.stage;
+          if (task.issue === "labels-conflict") task.issue = null;
+        });
+        this.changed(resolution.workspaceId);
+      } catch {
+        // The conflict banner stays until the labels are fixed by hand.
+      }
+    }
   }
   /**
    * Combine every agent's evidence into one display time and one archive gate. Only a full

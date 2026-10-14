@@ -624,3 +624,100 @@ it("refuses a foreign host's persisted data without touching its workspaces", as
     board.dispose();
   }
 });
+
+it("resolves an externally added status label when exclusivity is enabled", async () => {
+  const { board, host, inventory, store } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    inventory.workspaces[0].labels = ["customer", "task:todo", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "done",
+      labels: ["customer", "task:done"],
+      managedLabels: ["task:done"],
+      issue: null,
+    });
+    expect(host.setLabel).toHaveBeenCalledWith(
+      "w",
+      "task:todo",
+      "emerald",
+      false,
+    );
+    expect(store.current.tasks[0]).toMatchObject({
+      lastStage: "done",
+      issue: null,
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("keeps an unattributable conflict manual when no single newcomer exists", async () => {
+  const { board, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    inventory.workspaces[0].labels = ["customer", "task:review", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "conflict",
+      issue: "labels-conflict",
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("keeps the conflict banner when the newest-wins sync fails", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    host.setLabel = vi.fn(async () => {
+      throw new Error("Bridge unavailable");
+    });
+    inventory.workspaces[0].labels = ["customer", "task:todo", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "conflict",
+      issue: "labels-conflict",
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("keeps default behavior unchanged when exclusivity is off", async () => {
+  const { board, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    inventory.workspaces[0].labels = ["customer", "task:todo", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "conflict",
+      issue: "labels-conflict",
+    });
+  } finally {
+    board.dispose();
+  }
+});
