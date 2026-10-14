@@ -118,6 +118,21 @@ export function toggleButtonState(selected: boolean) {
     : { accessibilityState: { selected } };
 }
 
+/**
+ * A right click anywhere on the card opens the actions menu. React Native Web forwards the
+ * DOM `contextmenu` handler; native builds receive an empty object, so nothing is attached.
+ */
+export function contextMenuProps(onContextMenu: () => void) {
+  if (Platform.OS !== "web") return {};
+  return {
+    onContextMenu(event: { preventDefault(): void; stopPropagation(): void }) {
+      event.preventDefault();
+      event.stopPropagation();
+      onContextMenu();
+    },
+  } as unknown as Record<string, unknown>;
+}
+
 export function duringDrag(cancel: () => void, resize = false): () => void {
   if (Platform.OS !== "web") return () => {};
   const { cursor, userSelect } = document.body.style;

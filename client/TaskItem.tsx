@@ -2,7 +2,13 @@ import { useState, type ComponentProps } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
-import { Icon, Modal, useToast } from "@getpaseo/plugin/client/react-native";
+import {
+  copyText,
+  Icon,
+  Modal,
+  TextInput,
+  useToast,
+} from "@getpaseo/plugin/client/react-native";
 import {
   groupKind,
   isTerminalGroup,
@@ -23,6 +29,10 @@ import { groupColor, supplementalColor } from "./colors";
 import { HintButton } from "./Hint";
 import { PriorityPicker } from "./PriorityPicker";
 import { design, typography } from "./design";
+import { ConfirmationModal } from "./ConfirmationModal";
+import { contextMenuProps } from "./web";
+
+type LabelDefinition = { name: string; color: string };
 
 function CardAction({
   theme,
@@ -56,6 +66,7 @@ export function TaskItem({
   theme,
   disabled,
   pending,
+  labels,
   onOpen,
   onEdit,
   onStart,
@@ -63,6 +74,12 @@ export function TaskItem({
   onArchive,
   onCancelBinding,
   onDetachDraft,
+  onPin,
+  onRename,
+  onMarkUnread,
+  onClearAttention,
+  onArchiveWorkspace,
+  onSetLabel,
   onUndo,
   onPriorityChange,
   compact = false,
@@ -75,6 +92,7 @@ export function TaskItem({
   theme: PluginSurfaceProps["theme"];
   disabled: boolean;
   pending: boolean;
+  labels?: LabelDefinition[];
   onOpen(): void;
   onEdit(): void;
   onStart(): void;
@@ -82,6 +100,12 @@ export function TaskItem({
   onArchive(): void;
   onCancelBinding(): void;
   onDetachDraft(draftId: string): void;
+  onPin(pinned: boolean): Promise<boolean>;
+  onRename(title: string): Promise<boolean>;
+  onMarkUnread(): Promise<boolean>;
+  onClearAttention(): Promise<boolean>;
+  onArchiveWorkspace(): Promise<boolean>;
+  onSetLabel(label: LabelDefinition, assigned: boolean): Promise<boolean>;
   onUndo?(): Promise<void>;
   onPriorityChange?(priority: Priority): Promise<boolean>;
   compact?: boolean;
@@ -103,6 +127,10 @@ export function TaskItem({
     />
   );
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [titleHovered, setTitleHovered] = useState(false);
   const toast = useToast();
   const request = card.changeRequest;
@@ -277,6 +305,270 @@ export function TaskItem({
     <Text style={[styles.cardMeta, { color: theme.colors.statusWarning }]}>
       {t.changeRequestUnavailable}
     </Text>
+  );
+  const openActions = () => setActionsOpen(true);
+  const workspaceActions =
+    !isDraft && card.archived === null && card.binding === null;
+  const copy = async (text: string) => {
+    setActionsOpen(false);
+    try {
+      await copyText(text);
+      toast.show(t.copied, { variant: "success", durationMs: 1600 });
+    } catch {
+      toast.error(t.copyFailed);
+    }
+  };
+  const menuItem = (options: {
+    key: string;
+    icon: string;
+    label: string;
+    disabled?: boolean;
+    destructive?: boolean;
+    onPress(): void;
+  }) => (
+    <HintButton
+      key={options.key}
+      hint={options.label}
+      accessibilityRole="button"
+      accessibilityLabel={options.label}
+      testID={`workboard-action-${options.key}-${card.id}`}
+      disabled={options.disabled}
+      onPress={options.onPress}
+      style={({ pressed }) => [
+        styles.menuAction,
+        !options.disabled &&
+          pressed && { backgroundColor: theme.colors.surface2 },
+      ]}
+    >
+      <Icon
+        name={options.icon}
+        size={15}
+        color={
+          options.destructive
+            ? theme.colors.statusDanger
+            : options.disabled
+              ? theme.colors.foregroundMuted
+              : theme.colors.foreground
+        }
+      />
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.cardMeta,
+          {
+            flexShrink: 1,
+            color: options.destructive
+              ? theme.colors.statusDanger
+              : options.disabled
+                ? theme.colors.foregroundMuted
+                : theme.colors.foreground,
+          },
+        ]}
+      >
+        {options.label}
+      </Text>
+    </HintButton>
+  );
+  const menuActions = (
+    <View style={styles.menu}>
+      {workspaceActions &&
+        card.pinState !== "automatic" &&
+        menuItem({
+          key: "pin",
+          icon: card.pinState === "manual" ? "PinOff" : "Pin",
+          label: card.pinState === "manual" ? t.unpinWorkspace : t.pinWorkspace,
+          disabled: disabled || pending,
+          onPress: () => {
+            setActionsOpen(false);
+            void onPin(card.pinState !== "manual");
+          },
+        })}
+      {workspaceActions &&
+        card.workspaceDirectory !== null &&
+        menuItem({
+          key: "copy-path",
+          icon: "Copy",
+          label: t.copyPath,
+          disabled,
+          onPress: () => void copy(card.workspaceDirectory!),
+        })}
+      {workspaceActions &&
+        card.currentBranch !== null &&
+        menuItem({
+          key: "copy-branch",
+          icon: "GitBranch",
+          label: t.copyBranchName,
+          disabled,
+          onPress: () => void copy(card.currentBranch!),
+        })}
+      {workspaceActions &&
+        menuItem({
+          key: "rename",
+          icon: "Pencil",
+          label: t.renameWorkspace,
+          disabled: disabled || pending,
+          onPress: () => {
+            setActionsOpen(false);
+            setRenameTitle(card.title);
+            setRenaming(true);
+          },
+        })}
+      {workspaceActions &&
+        groupKind(card.stage, board.settings.groups) === "done" &&
+        menuItem({
+          key: "mark-unread",
+          icon: "Mail",
+          label: t.markUnread,
+          disabled: disabled || pending,
+          onPress: () => {
+            setActionsOpen(false);
+            void onMarkUnread();
+          },
+        })}
+      {workspaceActions &&
+        (card.activity === "attention" || card.activity === "error") &&
+        menuItem({
+          key: "clear-attention",
+          icon: "CheckCheck",
+          label: t.clearAttention,
+          disabled: disabled || pending,
+          onPress: () => {
+            setActionsOpen(false);
+            void onClearAttention();
+          },
+        })}
+      {workspaceActions &&
+        card.stage !== "conflict" &&
+        menuItem({
+          key: "archive-workspace",
+          icon: "Archive",
+          label: t.archiveWorkspace,
+          disabled: disabled || pending,
+          destructive: true,
+          onPress: () => {
+            setActionsOpen(false);
+            setConfirmingArchive(true);
+          },
+        })}
+      {workspaceActions && labels && labels.length > 0 && (
+        <View style={styles.menuLabels}>
+          <Text
+            style={[styles.cardMeta, { color: theme.colors.foregroundMuted }]}
+          >
+            {t.labelsSection}
+          </Text>
+          {labels.map((definition) => (
+            <HintButton
+              key={definition.name}
+              hint={definition.name}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`${t.labelsSection}: ${definition.name}`}
+              accessibilityState={{
+                checked: card.labels.includes(definition.name),
+              }}
+              testID={`workboard-label-${card.id}-${definition.name}`}
+              disabled={disabled || pending}
+              onPress={() =>
+                void onSetLabel(
+                  definition,
+                  !card.labels.includes(definition.name),
+                )
+              }
+              style={({ pressed }) => [
+                styles.menuAction,
+                styles.menuLabel,
+                disabled || pending
+                  ? { opacity: 0.5 }
+                  : pressed && { backgroundColor: theme.colors.surface2 },
+              ]}
+            >
+              <View
+                style={[styles.labelDot, { backgroundColor: definition.color }]}
+              />
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.cardMeta,
+                  { flexShrink: 1, color: theme.colors.foreground },
+                ]}
+              >
+                {definition.name}
+              </Text>
+              {card.labels.includes(definition.name) && (
+                <Icon name="Check" size={14} color={theme.colors.accent} />
+              )}
+            </HintButton>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+  const workspaceModals = (
+    <>
+      <Modal
+        open={renaming}
+        title={t.renameWorkspace}
+        onOpenChange={(open) => {
+          if (!open && !renameSaving) setRenaming(false);
+        }}
+      >
+        <Modal.Content>
+          <TextInput
+            value={renameTitle}
+            onChangeText={setRenameTitle}
+            editable={!renameSaving}
+            testID={`workboard-rename-input-${card.id}`}
+          />
+          <View style={styles.menuActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={renameSaving}
+              onPress={() => setRenaming(false)}
+              style={styles.menuButton}
+            >
+              <Text style={{ color: theme.colors.foreground }}>{t.cancel}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ busy: renameSaving }}
+              disabled={renameSaving || !renameTitle.trim()}
+              onPress={async () => {
+                setRenameSaving(true);
+                const saved = await onRename(renameTitle.trim());
+                setRenameSaving(false);
+                if (saved) {
+                  setRenaming(false);
+                  toast.show(t.renamed, {
+                    variant: "success",
+                    durationMs: 1600,
+                  });
+                }
+              }}
+              style={[
+                styles.menuButton,
+                (renameSaving || !renameTitle.trim()) && { opacity: 0.5 },
+              ]}
+            >
+              <Text style={{ color: theme.colors.accent }}>
+                {renameSaving ? t.working : t.save}
+              </Text>
+            </Pressable>
+          </View>
+        </Modal.Content>
+      </Modal>
+      {confirmingArchive && (
+        <ConfirmationModal
+          title={t.archiveWorkspace}
+          description={t.archiveWorkspaceConfirm.replace("{name}", card.title)}
+          confirmLabel={t.archiveWorkspace}
+          disabled={disabled || pending}
+          t={t}
+          theme={theme}
+          onClose={() => setConfirmingArchive(false)}
+          onConfirm={onArchiveWorkspace}
+        />
+      )}
+    </>
   );
   const actionButtons = (
     <View style={styles.rowMenu}>
@@ -647,6 +939,7 @@ export function TaskItem({
           },
           compact && styles.rowCompact,
         ]}
+        {...contextMenuProps(openActions)}
       >
         <View style={[styles.rowMain]}>
           <View style={styles.rowPriority}>{priorityPicker}</View>
@@ -656,6 +949,7 @@ export function TaskItem({
               accessibilityRole="button"
               accessibilityLabel={`${isDraft ? t.edit : t.openWorkspace}: ${card.title}`}
               onPress={isDraft ? onEdit : onOpen}
+              onLongPress={openActions}
               style={styles.cardTitlePressable}
             >
               <Text
@@ -775,8 +1069,10 @@ export function TaskItem({
               {card.title}
             </Text>
             {actionButtons}
+            {menuActions}
           </Modal.Content>
         </Modal>
+        {workspaceModals}
       </View>
     );
   }
@@ -796,6 +1092,7 @@ export function TaskItem({
             : {}),
         },
       ]}
+      {...contextMenuProps(openActions)}
     >
       {onUndo && (
         <HintButton
@@ -821,6 +1118,7 @@ export function TaskItem({
           accessibilityRole="button"
           accessibilityLabel={`${isDraft ? t.edit : t.openWorkspace}: ${card.title}`}
           onPress={isDraft ? onEdit : onOpen}
+          onLongPress={openActions}
           style={styles.cardTitlePressable}
         >
           <Text
@@ -951,16 +1249,8 @@ export function TaskItem({
         onOpenChange={setActionsOpen}
       >
         <Modal.Content>
-          <Text
-            numberOfLines={3}
-            style={[
-              typography.title,
-              { color: theme.colors.foreground, marginBottom: 8 },
-            ]}
-          >
-            {card.title}
-          </Text>
           {actionButtons}
+          {menuActions}
         </Modal.Content>
       </Modal>
       {terminal && card.dueAt && (
@@ -986,6 +1276,7 @@ export function TaskItem({
         </Text>
       )}
       {details}
+      {workspaceModals}
     </View>
   );
 }
@@ -1238,5 +1529,37 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  menu: { gap: 4 },
+  menuAction: {
+    minHeight: 36,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  menuLabels: {
+    gap: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(128,128,128,0.35)",
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  menuLabel: { minWidth: 0 },
+  labelDot: { width: 10, height: 10, borderRadius: 5 },
+  menuActionsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    paddingTop: 12,
+  },
+  menuButton: {
+    minWidth: 36,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
   },
 });
