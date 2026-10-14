@@ -721,3 +721,95 @@ it("keeps default behavior unchanged when exclusivity is off", async () => {
     board.dispose();
   }
 });
+it("resolves a standing conflict when exclusivity is enabled afterwards", async () => {
+  const { board, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    inventory.workspaces[0].labels = ["customer", "task:todo", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0].stage).toBe("conflict");
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    // The debounced refresh triggered by the save applies the persisted baseline.
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "done",
+      managedLabels: ["task:done"],
+      issue: null,
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("retries the newest-wins sync after a transient failure", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    host.setLabel = vi.fn(async () => {
+      throw new Error("Bridge unavailable");
+    });
+    inventory.workspaces[0].labels = ["customer", "task:todo", "task:done"];
+    await board.refresh();
+    expect(board.snapshot().cards[0].stage).toBe("conflict");
+    host.setLabel = vi.fn(async (id, name, _color, assigned) => {
+      const w = inventory.workspaces.find((w) => w.id === id)!;
+      w.labels = w.labels.filter((label) => label !== name);
+      if (assigned) w.labels.push(name);
+      return w.labels;
+    });
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "done",
+      managedLabels: ["task:done"],
+    });
+  } finally {
+    board.dispose();
+  }
+});
+it("skips the conversation re-read for preference-only settings saves", async () => {
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:todo"]));
+  await board.start();
+  const inventoryRead = vi.fn(host.inventory);
+  host.inventory = inventoryRead;
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    expect(inventoryRead).not.toHaveBeenCalled();
+    await board.mutate({
+      action: "settings",
+      revision: board.snapshot().revision,
+      expectedSettings: board.snapshot().settings,
+      settings: {
+        ...board.snapshot().settings,
+        groups: board
+          .snapshot()
+          .settings.groups.map((group) =>
+            group.id === "todo" ? { ...group, label: "task:backlog" } : group,
+          ),
+      },
+    });
+    expect(inventoryRead).toHaveBeenCalled();
+  } finally {
+    board.dispose();
+  }
+});
