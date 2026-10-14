@@ -369,6 +369,13 @@ export const taskSchema = z.object({
   updatedAt: z.string(),
   draftStage: stageSchema,
   lastStage: z.union([stageSchema, z.literal("conflict")]),
+  /**
+   * The most recent non-conflict stage the plugin observed. Newest-wins attribution reads
+   * this instead of lastStage, because lastStage is persisted as "conflict" and would
+   * otherwise make every conflict unattributable forever after one failed or pre-setting
+   * sync.
+   */
+  resolvedStage: stageSchema.nullable().default(null),
   lastConversationAt: z.string().nullable(),
   conversationStatus: z.enum(["known", "none", "unknown"]),
   conversationDisplayEvidence: conversationDisplaySchema.default("unknown"),
@@ -524,6 +531,7 @@ export function newTask(
     updatedAt: now,
     draftStage: stage,
     lastStage: stage,
+    resolvedStage: null,
     lastConversationAt: null,
     conversationStatus: "none",
     conversationDisplayEvidence: "none",
