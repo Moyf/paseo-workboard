@@ -189,7 +189,7 @@ const zh = {
   pinInProgressWorkspaces: "进行中任务在 Paseo 侧边栏自动置顶",
   pinInProgressHint:
     "按“进行中”分组判断；离开该分组时仅取消插件添加的置顶，保留你手动置顶的 workspace。",
-  exclusiveStatusLabels: "状态标签互斥（新标签替换旧标签）",
+  exclusiveStatusLabels: "状态标签互斥",
   exclusiveStatusHint:
     "任务在外部获得新的状态标签时，自动移除上一次的状态标签，只保留最新选择的分组；仅作用于下方分组配置的标签，其他标签不受影响。无法判断哪个标签更新时，仍会显示标签冲突提示。",
   pinWorkspace: "置顶",
@@ -634,7 +634,7 @@ const en: typeof zh = {
   pinInProgressWorkspaces: "Pin in-progress tasks in the Paseo sidebar",
   pinInProgressHint:
     "Use the In progress group. Leaving it removes only the pin added by this plugin; manually pinned workspaces stay pinned.",
-  exclusiveStatusLabels: "Exclusive status labels (newest replaces old)",
+  exclusiveStatusLabels: "Exclusive status labels",
   exclusiveStatusHint:
     "When a task gains a new status label outside Workboard, remove the previous status label and keep only the latest group. Only labels configured as groups below are affected; ordinary labels are untouched. Conflicts whose newest label cannot be determined still raise the banner.",
   pinWorkspace: "Pin",
