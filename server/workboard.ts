@@ -190,6 +190,10 @@ export class Workboard {
         data.serverId = this.host.identity.serverId;
       });
   }
+  /** Label definitions for the card menu's assignment section. */
+  listLabels() {
+    return this.host.listLabels();
+  }
   refresh(): Promise<void> {
     this.pendingRefresh = null;
     return this.flushRefresh();
@@ -289,6 +293,8 @@ export class Workboard {
             workspace?.labels ?? [],
             data.settings.groups,
           ),
+          workspaceDirectory: workspace?.workspaceDirectory ?? null,
+          currentBranch: workspace?.gitRuntime?.currentBranch ?? null,
           activity,
           changeRequest: projectChangeRequest(workspace),
           changeRequestUnavailable: !!workspace?.githubRuntime?.error,
@@ -1139,6 +1145,91 @@ export class Workboard {
                 archivedAt: this.stamp(),
                 lastConversationAt: null,
                 detail: "Draft archived; no native workspace",
+              };
+            });
+          } else if (input.action === "pin") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            const pinnedAt = await this.host.setPinned(
+              task.workspaceId,
+              input.pinned,
+            );
+            this.inventory.workspaces = this.inventory.workspaces.map((w) =>
+              w.id === task.workspaceId ? { ...w, pinnedAt } : w,
+            );
+            this.changed(task.workspaceId);
+          } else if (input.action === "rename-workspace") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            const title = await this.host.setTitle(
+              task.workspaceId,
+              input.title,
+            );
+            const fresh = await this.host.workspace(task.workspaceId);
+            if (fresh)
+              this.inventory.workspaces = this.inventory.workspaces.map((w) =>
+                w.id === task.workspaceId ? fresh : w,
+              );
+            await this.store.update((data) => {
+              const current = data.tasks.find((t) => t.id === task.id)!;
+              current.title = fresh?.name ?? title;
+            });
+            this.changed(task.workspaceId);
+          } else if (input.action === "mark-unread") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            await this.host.markUnread(task.workspaceId);
+          } else if (input.action === "clear-attention") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            await this.host.clearAttention(task.workspaceId);
+          } else if (input.action === "set-label") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            const labels = await this.host.setLabel(
+              task.workspaceId,
+              input.label.name,
+              input.label.color,
+              input.assigned,
+            );
+            this.inventory.workspaces = this.inventory.workspaces.map((w) =>
+              w.id === task.workspaceId ? { ...w, labels } : w,
+            );
+            this.changed(task.workspaceId);
+          } else if (input.action === "archive-workspace") {
+            if (!task.workspaceId || task.archived || task.binding)
+              throw new Error("workspace-unavailable");
+            const workspace = await this.host.workspace(task.workspaceId);
+            if (!workspace || workspace.archivingAt)
+              throw new Error("workspace-unavailable");
+            const safety = await this.host.safety(workspace);
+            if (safety) throw new Error(safety);
+            const result = await this.host.archive(task.workspaceId);
+            if (result.error || !result.archivedAt)
+              throw new Error(
+                result.error ?? "Native archive returned no timestamp",
+              );
+            const active = await this.host.inventory();
+            this.inventory = active;
+            if (active.workspaces.some((w) => w.id === task.workspaceId))
+              throw new Error(
+                "Native workspace still active after archive response",
+              );
+            await this.store.update((data) => {
+              const current = data.tasks.find((t) => t.id === task.id)!;
+              current.archived = {
+                operationId: randomUUID(),
+                kind: "manual",
+                status: "archived",
+                stage: current.lastStage,
+                group:
+                  data.settings.groups.find(
+                    (group) => group.id === current.lastStage,
+                  ) ?? null,
+                startedAt: this.stamp(),
+                archivedAt: result.archivedAt,
+                lastConversationAt: current.lastConversationAt,
+                detail: "Archived from the Workboard card menu",
               };
             });
           } else if (input.action === "detach-draft") {

@@ -7,7 +7,7 @@ import {
   UNSUPPORTED_STORAGE_VERSION_ERROR_CODE,
   UnsupportedStorageVersionError,
 } from "./shared/migrations";
-import { mutateRpc, snapshotRpc } from "./shared/rpc";
+import { labelsRpc, mutateRpc, snapshotRpc } from "./shared/rpc";
 import { PaseoCompat } from "./server/paseo-compat";
 import { PaseoHost } from "./server/host";
 import { Store } from "./server/store";
@@ -108,6 +108,10 @@ export default function contribute(server: PluginServerContext) {
   server.handle(snapshotRpc, () => {
     if (!board) throw new Error(error);
     return board.snapshot();
+  });
+  server.handle(labelsRpc, async () => {
+    if (!board) throw new Error(error);
+    return { labels: await board.listLabels() };
   });
   server.handle(mutateRpc, (input) => {
     if (!board) throw new Error(error);

@@ -217,6 +217,89 @@ export class PaseoCompat {
       throw new Error("Paseo did not remove the workspace pin");
     return result.pinnedAt;
   }
+  async setTitle(workspaceId: string, title: string): Promise<string> {
+    const result = z
+      .object({
+        workspaceId: z.string(),
+        accepted: z.boolean(),
+        title: z.string().nullable(),
+        error: z.string().nullable(),
+      })
+      .parse(
+        await this.request(
+          "workspace.title.set.request",
+          { workspaceId, title },
+          "workspace.title.set.response",
+        ),
+      );
+    if (result.workspaceId !== workspaceId)
+      throw new Error("Paseo workspace rename response workspace mismatch");
+    if (!result.accepted || result.error)
+      throw new Error(result.error ?? "Paseo workspace rename rejected");
+    if (result.title === null)
+      throw new Error("Paseo did not apply the workspace title");
+    return result.title;
+  }
+  async markUnread(workspaceId: string): Promise<void> {
+    const result = z
+      .object({
+        workspaceId: z.string(),
+        success: z.boolean(),
+        error: z.string().nullable(),
+      })
+      .parse(
+        await this.request(
+          "workspace.mark_unread.request",
+          { workspaceId },
+          "workspace.mark_unread.response",
+        ),
+      );
+    if (result.workspaceId !== workspaceId)
+      throw new Error("Paseo mark-unread response workspace mismatch");
+    if (!result.success)
+      throw new Error(result.error ?? "Paseo mark-unread rejected");
+  }
+  async clearAttention(workspaceId: string): Promise<void> {
+    const result = z
+      .object({
+        workspaceId: z.union([z.string(), z.array(z.string())]),
+        results: z.array(
+          z.object({
+            workspaceId: z.string(),
+            success: z.boolean(),
+            error: z.string().nullable(),
+          }),
+        ),
+      })
+      .parse(
+        await this.request(
+          "workspace.clear_attention.request",
+          { workspaceId },
+          "workspace.clear_attention.response",
+        ),
+      );
+    const own = result.results.find(
+      (entry) => entry.workspaceId === workspaceId,
+    );
+    if (!own)
+      throw new Error("Paseo clear-attention response workspace missing");
+    if (!own.success)
+      throw new Error(own.error ?? "Paseo clear-attention rejected");
+  }
+  async listLabels(): Promise<Array<{ name: string; color: string }>> {
+    const result = z
+      .object({
+        labels: z.array(z.object({ name: z.string(), color: z.string() })),
+      })
+      .parse(
+        await this.request(
+          "workspace.label.list.request",
+          {},
+          "workspace.label.list.response",
+        ),
+      );
+    return result.labels;
+  }
   async subagents(parentAgentId: string) {
     const result = z
       .object({

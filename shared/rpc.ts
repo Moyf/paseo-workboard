@@ -68,6 +68,37 @@ export const mutationSchema = z.discriminatedUnion("action", [
     operationId: z.string(),
   }),
   z.object({
+    action: z.literal("pin"),
+    taskId: z.string(),
+    pinned: z.boolean(),
+  }),
+  z.object({
+    action: z.literal("rename-workspace"),
+    taskId: z.string(),
+    title: z.string().trim().min(1).max(200),
+  }),
+  z.object({
+    action: z.literal("mark-unread"),
+    taskId: z.string(),
+  }),
+  z.object({
+    action: z.literal("clear-attention"),
+    taskId: z.string(),
+  }),
+  z.object({
+    action: z.literal("archive-workspace"),
+    taskId: z.string(),
+  }),
+  z.object({
+    action: z.literal("set-label"),
+    taskId: z.string(),
+    label: z.object({
+      name: z.string().trim().min(1).max(120),
+      color: z.string().min(1),
+    }),
+    assigned: z.boolean(),
+  }),
+  z.object({
     action: z.literal("resolve-archive"),
     taskId: z.string(),
     operationId: z.string(),
@@ -94,4 +125,13 @@ export const mutateRpc = defineRpc({
   name: "workboard.mutate",
   input: mutationSchema,
   output: boardSchema,
+});
+export const labelsRpc = defineRpc({
+  name: "workboard.labels",
+  input: z.object({}),
+  output: z.object({
+    labels: z.array(
+      z.object({ name: z.string().min(1), color: z.string().min(1) }),
+    ),
+  }),
 });

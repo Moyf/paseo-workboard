@@ -224,6 +224,8 @@ function card(
     dueAt: null,
     labels: workspaceId ? [`task:${stage}`] : [],
     managedLabels: workspaceId ? [`task:${stage}`] : [],
+    workspaceDirectory: null,
+    currentBranch: null,
     activity: "idle",
     agents: [],
     pinState: "none",
