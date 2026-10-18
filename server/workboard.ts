@@ -611,6 +611,12 @@ export class Workboard {
       stage: Stage;
       labels: string[];
     }> = [];
+    const autoStarts: Array<{
+      taskId: string;
+      workspaceId: string;
+      stage: Stage;
+      labels: string[];
+    }> = [];
     await this.store.update((data) => {
       const decideExclusivity = data.exclusiveStatusLabelsPending;
       let hasStatusConflict = false;
@@ -729,6 +735,36 @@ export class Workboard {
               labels: statusLabels(workspace.labels, data.settings.groups),
             });
         }
+        const priorActivity = imported ? null : task.lastActivity;
+        const activity = workspaceActivity(
+          inventory.agents.filter((a) => a.workspaceId === workspace.id),
+        );
+        task.lastActivity = activity;
+        // Auto start work: a conversation beginning on a task still sitting in an inbox or
+        // to-do group moves it to the configured start group. An agent that was already
+        // live has no idle->live transition, so enabling the setting never moves it.
+        const kind = groupKind(stage, data.settings.groups);
+        if (
+          data.settings.autoStartWork &&
+          priorActivity === "idle" &&
+          isActiveActivity(activity) &&
+          (kind === "inbox" || kind === "todo") &&
+          task.workspaceId &&
+          !task.binding &&
+          !task.archived
+        ) {
+          const target = defaultStartWorkGroup(
+            data.settings.groups,
+            data.settings.defaultStartWorkGroup,
+          );
+          if (target)
+            autoStarts.push({
+              taskId: task.id,
+              workspaceId: task.workspaceId,
+              stage: target,
+              labels: statusLabels(workspace.labels, data.settings.groups),
+            });
+        }
         let observation = observations.get(workspace.id);
         if (
           observation?.gate === "upper-bound" &&
@@ -796,6 +832,7 @@ export class Workboard {
     this.error = null;
     this.refreshedAt = this.stamp();
     if (resolutions.length) await this.resolveExclusivityConflicts(resolutions);
+    if (autoStarts.length) await this.startWork(autoStarts);
     for (const resolution of priorityResolutions) {
       if (this.stopped) return;
       try {
@@ -823,6 +860,43 @@ export class Workboard {
         this.changed(resolution.workspaceId);
       } catch {
         // An uncertain native write is retained for explicit user resolution, never retried.
+      }
+    }
+  }
+  /**
+   * Auto start work: the same verified stage move the Start work button uses, silently
+   * skipped when the workspace is gone, archiving, or the labels changed mid-flight. The
+   * recorded activity baseline makes the next conversation start try again.
+   */
+  private async startWork(
+    starts: ReadonlyArray<{
+      taskId: string;
+      workspaceId: string;
+      stage: Stage;
+      labels: string[];
+    }>,
+  ): Promise<void> {
+    for (const start of starts) {
+      if (this.stopped) return;
+      try {
+        const workspace = await this.transition(
+          start.workspaceId,
+          start.stage,
+          start.labels,
+        );
+        this.inventory.workspaces = this.inventory.workspaces.map((w) =>
+          w.id === workspace.id ? workspace : w,
+        );
+        await this.store.update((data) => {
+          const task = data.tasks.find((t) => t.id === start.taskId);
+          if (!task) return;
+          task.lastStage = start.stage;
+          task.resolvedStage = start.stage;
+          if (task.issue === "labels-conflict") task.issue = null;
+        });
+        this.changed(start.workspaceId);
+      } catch {
+        // Left in place on purpose; the next live transition retries.
       }
     }
   }

@@ -15,7 +15,7 @@ Workboard brings active workspaces into one board, with one task per workspace. 
 - **Status linked to workspace labels.** Move a task between groups or change its managed label in Paseo. Both update the same status while preserving unrelated labels. Exclusive status labels, enabled by default for new installations, replace a previous managed label when a new one can be identified.
 - **Activity at a glance.** See Agent activity, conversation dates, and PR/MR information supplied by Paseo, with CI status icons with counts and review text in both layouts, including compact lists. Filter by project, activity, PR/MR condition, attention, or last conversation date.
 - **View defaults and column widths.** Restore defaults clears all filters and resets every board/project-lane column to 280px. Choose Compact (220px), Standard (280px), or Wide (360px) to resize all columns together; individual columns can still be dragged.
-- **A configurable workflow.** Customize groups and their defaults, reorder tasks and groups by dragging or keyboard controls, and optionally pin in-progress workspaces in the sidebar.
+- **A configurable workflow.** Customize groups and their defaults, reorder tasks and groups by dragging or keyboard controls, optionally pin in-progress workspaces in the sidebar, and let a starting conversation move an Inbox or To do task to In progress automatically.
 - **Optional automatic archiving.** Configure Done and Canceled rules independently to archive eligible workspaces after their respective delays from their last verified conversation, with activity and Git safety checks. Disabled by default.
 - **Project lanes and priorities.** Group the board by project, expand or collapse all visible project lanes, set task priorities, and switch between priority sorting and the saved default order. Customize priority names and colors in Settings. Priorities are P0–P3, with P0 highest and P2 as the unlabeled default. Native P0/P1/P2/P3 labels sync both ways and remain exclusive.
 
@@ -41,7 +41,7 @@ Move a task to another group to update its managed status label. The recent move
 
 ![Moving a fictional task and undoing the move](images/move-undo-en.gif)
 
-Group defaults, exclusive status labels, sidebar pinning, and optional automatic archive live in **Settings**.
+Group defaults, exclusive status labels, sidebar pinning, optional automatic archive, and auto start work live in **Settings**.
 
 See the [archive guide](https://github.com/fxbing/paseo-workboard/blob/main/docs/user-guide.md#archive-workspaces) for independent Done and Canceled switches, always-visible waiting-period controls, and due-task confirmation.
 

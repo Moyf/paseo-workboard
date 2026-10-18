@@ -72,7 +72,6 @@ import { QuickCreate } from "./QuickCreate";
 import { HintButton, HintProvider } from "./Hint";
 import { usePaseoLanguage } from "./paseo-language";
 import { ConfirmationModal } from "./ConfirmationModal";
-
 type Page = "board" | "archive" | "draft-archive" | "settings";
 type DraftForm = {
   task?: Card;
@@ -98,7 +97,6 @@ const sameGroup = (board: Board | undefined, group: MoveUndo["group"]) => {
 };
 const sameCard = (left: Card | undefined, right: Card) =>
   !!left && JSON.stringify(left) === JSON.stringify(right);
-
 export function WorkboardScreen(
   props: PluginSurfaceProps & { initialPage?: Page },
 ) {
@@ -108,7 +106,6 @@ export function WorkboardScreen(
     </HintProvider>
   );
 }
-
 function HostWorkboard(props: PluginSurfaceProps & { initialPage?: Page }) {
   const [surfaceWidth, setSurfaceWidth] = useState<number | null>(null);
   const callSnapshot = useRpc(snapshotRpc);
@@ -1588,7 +1585,6 @@ function HostWorkboard(props: PluginSurfaceProps & { initialPage?: Page }) {
     </View>
   );
 }
-
 function ConflictNotice({
   cards,
   disabled,
@@ -2982,6 +2978,22 @@ export function SettingsPage({
                 disabled={controlDisabled("exclusive")}
                 testID="workboard-exclusive-status-labels"
               />
+              <SettingsSwitch
+                label={t.autoStartWork}
+                hint={t.autoStartWorkHint}
+                value={settings.autoStartWork}
+                onValueChange={async (value) => {
+                  await persist(
+                    {
+                      ...settings,
+                      autoStartWork: value,
+                    },
+                    "auto-start",
+                  );
+                }}
+                disabled={controlDisabled("auto-start")}
+                testID="workboard-auto-start"
+              />
               <SettingsSelect
                 label={t.defaultDraftGroupSetting}
                 value={
@@ -3634,7 +3646,6 @@ const styles = StyleSheet.create({
   },
   hintText: { fontSize: 13, lineHeight: 18 },
 });
-
 export function mutationErrorText(
   error: unknown,
   t: ReturnType<typeof strings>,
