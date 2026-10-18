@@ -143,6 +143,7 @@ const preferences = {
   defaultStartWorkGroup: stageSchema.nullable().default(null),
   pinInProgressWorkspaces: z.boolean().default(true),
   exclusiveStatusLabels: z.boolean().default(false),
+  autoStartWork: z.boolean().default(false),
 };
 export const settingsSchema = z.object({
   ...preferences,
@@ -358,6 +359,13 @@ export type ConversationDisplay = z.infer<typeof conversationDisplaySchema>;
 export type ConversationGate = z.infer<typeof conversationGateSchema>;
 export type ConversationReason = z.infer<typeof conversationReasonSchema>;
 export type ConversationAgent = z.infer<typeof conversationAgentSchema>;
+export const activitySchema = z.enum([
+  "idle",
+  "running",
+  "waiting",
+  "attention",
+  "error",
+]);
 export const taskSchema = z.object({
   id: z.string(),
   workspaceId: z.string().nullable(),
@@ -376,6 +384,12 @@ export const taskSchema = z.object({
    * sync.
    */
   resolvedStage: stageSchema.nullable().default(null),
+  /**
+   * The aggregated agent activity as last observed. Auto start work triggers on the
+   * observed transition into a live conversation (idle -> running/waiting), so an agent
+   * that was already running when the setting was enabled never moves retroactively.
+   */
+  lastActivity: activitySchema.nullable().default(null),
   lastConversationAt: z.string().nullable(),
   conversationStatus: z.enum(["known", "none", "unknown"]),
   conversationDisplayEvidence: conversationDisplaySchema.default("unknown"),
@@ -448,13 +462,6 @@ export const dataSchema = z
     }
   });
 export type Data = z.infer<typeof dataSchema>;
-export const activitySchema = z.enum([
-  "idle",
-  "running",
-  "waiting",
-  "attention",
-  "error",
-]);
 export const pinStateSchema = z
   .enum(["none", "automatic", "manual"])
   .default("none");
@@ -532,6 +539,7 @@ export function newTask(
     draftStage: stage,
     lastStage: stage,
     resolvedStage: null,
+    lastActivity: null,
     lastConversationAt: null,
     conversationStatus: "none",
     conversationDisplayEvidence: "none",
