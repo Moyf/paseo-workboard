@@ -2413,6 +2413,22 @@ export function SettingsPage({
                 testID="workboard-exclusive-status-labels"
               />
               <SettingsSwitch
+                label={t.autoStartWork}
+                hint={t.autoStartWorkHint}
+                value={settings.autoStartWork}
+                onValueChange={async (value) => {
+                  await persist(
+                    {
+                      ...settings,
+                      autoStartWork: value,
+                    },
+                    "auto-start",
+                  );
+                }}
+                disabled={controlDisabled("auto-start")}
+                testID="workboard-auto-start"
+              />
+              <SettingsSwitch
                 label={t.autoArchive}
                 hint={[
                   t.autoArchiveHint.replace(

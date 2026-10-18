@@ -966,3 +966,83 @@ it("skips the conversation re-read for preference-only settings saves", async ()
     board.dispose();
   }
 });
+
+it("moves a to-do task to In progress when its agent starts a conversation", async () => {
+  const { board, inventory, store } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["task:todo"]));
+  inventory.agents.push({
+    id: "a",
+    workspaceId: "w",
+    title: null,
+    activity: "idle",
+    updatedAt: "2026-08-01T00:00:00Z",
+    lastUserMessageAt: "2026-08-01T00:00:00Z",
+  });
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, autoStartWork: true },
+    });
+    inventory.agents[0].activity = "running";
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "in-progress",
+      managedLabels: ["task:in-progress"],
+    });
+    expect(inventory.workspaces[0].labels).toEqual(["task:in-progress"]);
+    expect(store.current.tasks[0].lastActivity).toBe("running");
+  } finally {
+    board.dispose();
+  }
+});
+it("leaves review-parked and already-running tasks alone", async () => {
+  const { board, inventory } = fixture();
+  inventory.workspaces.push(workspace("parked", "Parked", ["task:review"]));
+  inventory.workspaces.push(workspace("live", "Live", ["task:todo"]));
+  inventory.agents.push(
+    {
+      id: "p",
+      workspaceId: "parked",
+      title: null,
+      activity: "idle",
+      updatedAt: "2026-08-01T00:00:00Z",
+      lastUserMessageAt: "2026-08-01T00:00:00Z",
+    },
+    {
+      id: "l",
+      workspaceId: "live",
+      title: null,
+      activity: "running",
+      updatedAt: "2026-08-01T00:00:00Z",
+      lastUserMessageAt: "2026-08-01T00:00:00Z",
+    },
+  );
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, autoStartWork: true },
+    });
+    inventory.agents[0].activity = "running";
+    await board.refresh();
+    const cards = board.snapshot().cards;
+    expect(cards.find((card) => card.workspaceId === "parked")).toMatchObject({
+      stage: "review",
+    });
+    expect(cards.find((card) => card.workspaceId === "live")).toMatchObject({
+      stage: "todo",
+      managedLabels: ["task:todo"],
+    });
+    expect(inventory.workspaces[0].labels).toEqual(["task:review"]);
+    expect(inventory.workspaces[1].labels).toEqual(["task:todo"]);
+  } finally {
+    board.dispose();
+  }
+});

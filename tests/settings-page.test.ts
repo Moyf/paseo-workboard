@@ -154,6 +154,7 @@ it.each([
     "exclusiveStatusLabels",
     true,
   ],
+  ["auto start work", "workboard-auto-start", "autoStartWork", true],
 ] as const)(
   "persists %s when its switch changes and keeps it after reopening",
   async (_, testID, key, value) => {
@@ -186,7 +187,9 @@ it.each([
         ? "settings:archive"
         : key === "exclusiveStatusLabels"
           ? "settings:exclusive"
-          : "settings:pin",
+          : key === "autoStartWork"
+            ? "settings:auto-start"
+            : "settings:pin",
     );
     expect(
       findByTestId(renderSettings(initial, mutate), testID).props.value,

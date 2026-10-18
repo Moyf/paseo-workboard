@@ -190,6 +190,9 @@ const zh = {
   pinInProgressHint:
     "按“进行中”分组判断；离开该分组时仅取消插件添加的置顶，保留你手动置顶的 workspace。",
   exclusiveStatusLabels: "状态标签互斥",
+  autoStartWork: "会话开始时自动添加「进行中」",
+  autoStartWorkHint:
+    "仅当任务在收件箱或待办分组、且其 workspace 的 Agent 开始运行或等待输入时，自动移到「开始工作默认分组」并写入状态标签。暂停、评审、已完成、已取消的任务不受影响，开启时正在运行的会话也不会被追溯移动。",
   exclusiveStatusHint:
     "任务在外部获得新的状态标签时，自动移除上一次的状态标签，只保留最新选择的分组；仅作用于下方分组配置的标签，其他标签不受影响。无法判断哪个标签更新时，仍会显示标签冲突提示。",
   pinWorkspace: "置顶",
@@ -643,6 +646,9 @@ const en: typeof zh = {
   pinInProgressHint:
     "Use the In progress group. Leaving it removes only the pin added by this plugin; manually pinned workspaces stay pinned.",
   exclusiveStatusLabels: "Exclusive status labels",
+  autoStartWork: "Auto move to In progress when a conversation starts",
+  autoStartWorkHint:
+    "Only when a task sits in an Inbox or To do group and its workspace's agent starts running or waiting for input: it moves to the Start work group and its status label is written. Paused, review, done, and canceled tasks are untouched, and conversations already running when you enable this are never moved retroactively.",
   exclusiveStatusHint:
     "When a task gains a new status label outside Workboard, remove the previous status label and keep only the latest group. Only labels configured as groups below are affected; ordinary labels are untouched. Conflicts whose newest label cannot be determined still raise the banner.",
   pinWorkspace: "Pin",
