@@ -873,7 +873,98 @@ it("rejects card-menu workspace actions for drafts", async () => {
     board.dispose();
   }
 });
-
+it("resolves a label re-added externally after a board move before the next refresh", async () => {
+  // Fake timers hold back the debounced refresh the move schedules, so the
+  // external edit lands while the board still considers the move the newest
+  // change and no intermediate refresh runs.
+  vi.useFakeTimers();
+  const { board, host, inventory, store } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:done"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    await board.mutate({
+      action: "stage",
+      taskId: board.snapshot().cards[0].id,
+      stage: "in-progress",
+      expectedLabels: ["task:done"],
+    });
+    inventory.workspaces[0].labels = [
+      "customer",
+      "task:in-progress",
+      "task:done",
+    ];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "done",
+      labels: ["customer", "task:done"],
+      managedLabels: ["task:done"],
+      issue: null,
+    });
+    expect(host.setLabel).toHaveBeenCalledWith(
+      "w",
+      "task:in-progress",
+      "emerald",
+      false,
+    );
+    expect(store.current.tasks[0]).toMatchObject({
+      lastStage: "done",
+      resolvedStage: "done",
+      issue: null,
+    });
+  } finally {
+    board.dispose();
+    vi.useRealTimers();
+  }
+});
+it("resolves a third stage's label added externally after a board move", async () => {
+  vi.useFakeTimers();
+  const { board, host, inventory } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:done"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    await board.mutate({
+      action: "stage",
+      taskId: board.snapshot().cards[0].id,
+      stage: "in-progress",
+      expectedLabels: ["task:done"],
+    });
+    inventory.workspaces[0].labels = [
+      "customer",
+      "task:in-progress",
+      "task:review",
+    ];
+    await board.refresh();
+    expect(board.snapshot().cards[0]).toMatchObject({
+      stage: "review",
+      labels: ["customer", "task:review"],
+      managedLabels: ["task:review"],
+      issue: null,
+    });
+    expect(host.setLabel).toHaveBeenCalledWith(
+      "w",
+      "task:in-progress",
+      "orange",
+      false,
+    );
+  } finally {
+    board.dispose();
+    vi.useRealTimers();
+  }
+});
 it("resolves a standing conflict when exclusivity is enabled afterwards", async () => {
   const { board, inventory } = fixture();
   inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
