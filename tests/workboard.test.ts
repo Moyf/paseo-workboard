@@ -965,6 +965,66 @@ it("resolves a third stage's label added externally after a board move", async (
     vi.useRealTimers();
   }
 });
+it("resolves a label added externally between binding and reconciliation", async () => {
+  vi.useFakeTimers();
+  const { board, host, inventory, store } = fixture();
+  inventory.workspaces.push(workspace("w", "Task", ["customer", "task:done"]));
+  await board.start();
+  try {
+    const view = board.snapshot();
+    await board.mutate({
+      action: "settings",
+      revision: view.revision,
+      expectedSettings: view.settings,
+      settings: { ...view.settings, exclusiveStatusLabels: true },
+    });
+    const draft = (
+      await board.mutate({
+        action: "create",
+        title: "Idea",
+        description: "",
+        projectId: null,
+      })
+    ).cards.find((card) => card.title === "Idea")!;
+    // The external edit lands when the post-binding reconciliation reads the
+    // inventory: after the verified transition, before the baseline is used.
+    const readInventory = host.inventory;
+    host.inventory = async () => {
+      const w = inventory.workspaces.find((w) => w.id === "w")!;
+      if (!w.labels.includes("task:done")) w.labels.push("task:done");
+      return readInventory();
+    };
+    const started = await board.mutate({
+      action: "start",
+      taskId: draft.id,
+      target: { kind: "existing", workspaceId: "w" },
+      stage: "in-progress",
+    });
+    expect(started.cards).toHaveLength(1);
+    expect(started.cards[0]).toMatchObject({
+      workspaceId: "w",
+      stage: "done",
+      labels: ["customer", "task:done"],
+      managedLabels: ["task:done"],
+      issue: null,
+    });
+    expect(host.setLabel).toHaveBeenCalledWith(
+      "w",
+      "task:in-progress",
+      "emerald",
+      false,
+    );
+    expect(store.current.tasks[0]).toMatchObject({
+      workspaceId: "w",
+      lastStage: "done",
+      resolvedStage: "done",
+      issue: null,
+    });
+  } finally {
+    board.dispose();
+    vi.useRealTimers();
+  }
+});
 it("resolves a standing conflict when exclusivity is enabled afterwards", async () => {
   const { board, inventory } = fixture();
   inventory.workspaces.push(workspace("w", "Task", ["customer", "task:todo"]));
