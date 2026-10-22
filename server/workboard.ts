@@ -1114,6 +1114,11 @@ export class Workboard {
                 const current = data.tasks.find((t) => t.id === task.id)!;
                 this.checkStageExpected(data, input);
                 current.lastStage = input.stage;
+                // The verified sync made this a clean observation: move the
+                // newest-wins baseline with it, or an external label change
+                // arriving before the next refresh would be attributed
+                // against the stale stage and could delete the newer label.
+                current.resolvedStage = input.stage;
                 current.updatedAt = this.stamp(current.updatedAt);
                 if (current.issue === "labels-conflict") current.issue = null;
               });
@@ -1128,6 +1133,7 @@ export class Workboard {
                 this.checkStageExpected(data, input);
                 current.draftStage = input.stage;
                 current.lastStage = input.stage;
+                current.resolvedStage = input.stage;
                 current.updatedAt = this.stamp(current.updatedAt);
               });
             }
@@ -1244,6 +1250,9 @@ export class Workboard {
                 if (archive.kind === "draft")
                   current.draftStage = archive.stage;
                 current.lastStage = archive.stage;
+                // Restoring establishes the stage, so the attribution
+                // baseline moves with it.
+                current.resolvedStage = archive.stage;
                 // Keep the manual restore until reconciliation confirms native membership.
                 current.issue = current.workspaceId
                   ? "archive-restored-workspace-unavailable"
