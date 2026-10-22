@@ -22,7 +22,6 @@ export const REQUEST_FILTERS = [
   "unavailable",
 ] as const;
 export const DATE_RANGES = ["any", "today", "3days", "week", "month"] as const;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const filterSchema = z.object({
   projectId: z.string().min(1).catch("all"),
   search: z.string().catch(""),
@@ -54,7 +53,8 @@ export function activeFilterCount(filters: BoardFilters): number {
 /**
  * A card's displayed date is its last conversation time; cards without one cannot match a
  * range. Windows start at local midnight — today covers today, 3 days covers today and the
- * two before it, week is Monday-based, month is the calendar month.
+ * two before it, week is Monday-based, month is the calendar month. Boundaries move with
+ * calendar-day arithmetic (setDate), so daylight-saving shifts never skew them by an hour.
  */
 export function matchesDateRange(
   card: Card,
@@ -71,7 +71,10 @@ export function matchesDateRange(
   midnight.setHours(0, 0, 0, 0);
   const date = new Date(midnight);
   if (range === "today") return time >= midnight.getTime();
-  if (range === "3days") return time >= midnight.getTime() - 2 * DAY_MS;
+  if (range === "3days") {
+    date.setDate(date.getDate() - 2);
+    return time >= date.getTime();
+  }
   if (range === "week") {
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
     return time >= date.getTime();
