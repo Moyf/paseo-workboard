@@ -1341,6 +1341,12 @@ export class Workboard {
         await this.store.update((data) => {
           const task = data.tasks.find((t) => t.id === survivorId)!;
           task.binding = null;
+          // The verified sync made binding.stage a clean observation: move
+          // both stage fields with it, or an external label change arriving
+          // before the next reconciliation would be attributed against the
+          // survivor's stale stage and could delete the newer label.
+          task.lastStage = binding.stage;
+          task.resolvedStage = binding.stage;
           task.issue = null;
         });
       } catch (error) {
