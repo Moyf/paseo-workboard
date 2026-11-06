@@ -551,7 +551,7 @@ it("keeps absent priority metadata out of the migrated JSON", () => {
   expect(migrated.settings.priorityStyles).toBeUndefined();
   // The host persists migration output as JSON: a present key holding undefined
   // is invalid input, so absent priority metadata stays an absent key.
-  expect(JSON.parse(JSON.stringify(migrated))).toEqual(migrated);
+  expect(JSON.parse(JSON.stringify(migrated))).toStrictEqual(migrated);
 });
 
 it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])(
